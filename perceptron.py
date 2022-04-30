@@ -24,43 +24,35 @@ class QPerceptron():
         ui = qiskit.QuantumCircuit(q)
         ui.h(q)
 
+        prev_step = self._nBin(0)
         for s in range(1, np.power(2, self.n)):
             step = self._nBin(s)
-            apply_x = np.zeros(self.n)
-            for i, pos in enumerate(step):
-                if pos == '0':
+            for i, state in enumerate(step):
+                if state != prev_step[i]:
                     ui.x(q[i])
-                    apply_x[i] = 1
-
+                
             th = self.theta[s] - self.theta[0]
             ui.mcrz(lam=th, q_controls=q[:-1], q_target=q[-1])
 
-            for p, x in enumerate(apply_x):
-                if x == 1:
-                    ui.x(q[p])
+            prev_step = step
+
         return ui
     
     def make_uw(self):
         q = qiskit.QuantumRegister(self.n, 'qr')
         uw = qiskit.QuantumCircuit(q)
-        
+
+        prev_step = self._nBin(0)
         for s in range(1, np.power(2, self.n)):
             step = self._nBin(s)
-            apply_x = np.zeros(self.n)
-            for i, pos in enumerate(step):
-                if pos == '0':
+            for i, state in enumerate(step):
+                if state != prev_step[i]:
                     uw.x(q[i])
-                    apply_x[i] = 1
-
+                
             th = self.phi[s] - self.phi[0]
-            th = self.theta[s] - self.theta[0]
+            uw.mcrz(lam=th, q_controls=q[:-1], q_target=q[-1])
 
-            controls = [q[i] for i in range(self.n - 1)]
-            uw.mcrz(lam=th, q_controls=controls, q_target=q[-1])
-
-            for p, x in enumerate(apply_x):
-                if x == 1:
-                    uw.x(q[p])
+            prev_step = step
             
         uw.h(q)
         uw.x(q)
@@ -84,6 +76,9 @@ class QPerceptron():
         circuit.measure(ansilla, meas)
 
         return circuit
+
+    def __str__(self):
+        return self.draw_circuit()
 
     def draw_ui(self):
         print(self.make_ui().draw())

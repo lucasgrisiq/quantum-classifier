@@ -35,10 +35,8 @@ class QPerceptron():
         prev_step = self._nBin(0)
         for s in range(1, np.power(2, self.n)):
             step = self._nBin(s)
-            print(f'step: {step}')
             for i, state in enumerate(step):
                 if state != prev_step[i]:
-                    print(f'x {q[i]}')
                     ui.x(q[i])
                 
             th = self.theta[s] - self.theta[0]
@@ -116,7 +114,7 @@ class QPerceptron():
         print('Iter: {} | Custo: {}'.format(len(self.cost_array), self.cost_array[-1]))
         print(xk)
 
-    def train(self, maxiter: int = 300, learning_rate: float = 0.2):
+    def fit(self, maxiter: int = 300, learning_rate: float = 0.2):
         # spsa = SPSA(maxiter=maxiter)
 
         # result = spsa.optimize(
@@ -144,10 +142,3 @@ class QPerceptron():
 
         print(res)
         return res
-    
-
-
-
-if __name__ == "__main__":
-    p = QPerceptron(10)
-    print(p.run(0, 1, [0.5]*10))

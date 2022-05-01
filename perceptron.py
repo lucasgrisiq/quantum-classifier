@@ -1,25 +1,33 @@
 import qiskit
+from qiskit.algorithms.optimizers import SPSA
+from noisyopt import minimizeSPSA
 import numpy as np
+
+from utils import train_df, test_df
+
+_train_df = train_df()
+_test_df = test_df()
+train16_df = train_df(16)
+test16_df = test_df(16)
 
 class QPerceptron():
     
-    def __init__(self, n, theta, phi):
+    def __init__(self, n):
         self.n = n
-        self.theta = theta
-        self.phi = phi
         self.qstates = qiskit.QuantumRegister(n, 'qr')
-        self.circuit = self.make_circuit()
-    
+        self.input_states = _train_df.values if n == 10 else train16_df.values
+        self.sim = qiskit.Aer.get_backend('qasm_simulator')
+
     def _nBin(self, x):
         return (''.join('0' for _ in range(self.n)) + bin(x)[2:])[-self.n:]
 
-    def set_theta(self, theta):
-        self.theta = theta
+    def set_inputs(self, inputs):
+        self.theta = inputs
     
-    def set_phi(self, phi):
-        self.phi = phi
+    def set_weights(self, weights):
+        self.phi = weights
 
-    def make_ui(self):
+    def _make_ui(self):
         q = qiskit.QuantumRegister(self.n, 'qr')
         ui = qiskit.QuantumCircuit(q)
         ui.h(q)
@@ -27,8 +35,10 @@ class QPerceptron():
         prev_step = self._nBin(0)
         for s in range(1, np.power(2, self.n)):
             step = self._nBin(s)
+            print(f'step: {step}')
             for i, state in enumerate(step):
                 if state != prev_step[i]:
+                    print(f'x {q[i]}')
                     ui.x(q[i])
                 
             th = self.theta[s] - self.theta[0]
@@ -38,7 +48,7 @@ class QPerceptron():
 
         return ui
     
-    def make_uw(self):
+    def _make_uw(self):
         q = qiskit.QuantumRegister(self.n, 'qr')
         uw = qiskit.QuantumCircuit(q)
 
@@ -48,7 +58,7 @@ class QPerceptron():
             for i, state in enumerate(step):
                 if state != prev_step[i]:
                     uw.x(q[i])
-                
+
             th = self.phi[s] - self.phi[0]
             uw.mcrz(lam=th, q_controls=q[:-1], q_target=q[-1])
 
@@ -64,8 +74,8 @@ class QPerceptron():
         meas = qiskit.ClassicalRegister(1, 'cr0')
         circuit = qiskit.QuantumCircuit(self.qstates, ansilla, meas)
 
-        ui = self.make_ui().to_gate(label='Ui')
-        uw = self.make_uw().to_gate(label='Uw')
+        ui = self._make_ui().to_gate(label='Ui')
+        uw = self._make_uw().to_gate(label='Uw')
 
         circuit.append(ui, self.qstates)
         circuit.barrier()
@@ -77,23 +87,67 @@ class QPerceptron():
 
         return circuit
 
-    def __str__(self):
-        return self.draw_circuit()
+    def run(self, index: int, weights: list, threshold: float = 0.5):
+        inputs = self.input_states[index][0]
 
-    def draw_ui(self):
-        print(self.make_ui().draw())
+        self.set_inputs(inputs)
+        self.set_weights(weights)
+        self.circuit = self.make_circuit()
 
-    def draw_uw(self):
-        print(self.make_uw().draw())
+        result = qiskit.execute(self.circuit, self.sim, shots=10).result().get_counts()
+        resp = result['1'] / (result['1'] + result['0'])
 
-    def draw_circuit(self):
-        print(self.circuit.draw())
+        if resp > threshold:
+            return 1
+        else:
+            return 0
+
+    def cost_function(self, w: list):
+        cost = 0
+        for i in range(len(self.input_states)):
+            y = self.run(i, w)
+            cost += (self.input_states[i][1] - y) ** 2
+        cost /= len(self.input_states)
+        self.cost_array.append(cost)
+        return cost
+
+    def callback_spsa(self, xk):
+        print('callback')
+        print('Iter: {} | Custo: {}'.format(len(self.cost_array), self.cost_array[-1]))
+        print(xk)
+
+    def train(self, maxiter: int = 300, learning_rate: float = 0.2):
+        # spsa = SPSA(maxiter=maxiter)
+
+        # result = spsa.optimize(
+        #     num_vars = size,
+        #     objective_function = self.cost_function,
+        #     variable_bounds = [(0, np.pi/2)]*size,
+        #     initial_point = [0]*size
+        # )
+        
+        size = len(self.input_states[0][0])
+        x0 = np.random.uniform(0, np.pi/2, size)
+        self.cost_array = []
+
+        res = minimizeSPSA(
+            func=self.cost_function,
+            x0=x0,
+            bounds=[(0, np.pi/2)]*size,
+            niter=maxiter,
+            paired=False,   # sem seed
+            c=0.1, # qtd de aleatoriedade  
+            a=learning_rate,
+            callback=self.callback_spsa,
+            disp=True
+        )
+
+        print(res)
+        return res
+    
+
 
 
 if __name__ == "__main__":
-    n = 3
-    theta = np.random.uniform(0, 2*np.pi, size=8)
-    phi = np.random.uniform(0, 2*np.pi, size=8)
-
-    p = QPerceptron(n, theta, phi)
-    p.draw_circuit()
+    p = QPerceptron(10)
+    print(p.run(0, 1, [0.5]*10))

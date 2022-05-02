@@ -89,9 +89,9 @@ class QPerceptron():
         resp = result.get('1', 0) / 10
  
         if resp > threshold:
-            return 1
+            return 1, resp
         else:
-            return 0
+            return 0, resp
  
     def cost_function(self, w: list):
         # make uw gate
@@ -101,7 +101,7 @@ class QPerceptron():
         # init calculation
         cost = 0
         for i in range(len(self.input_states)):
-            y = self.run(i, uw)
+            y, _ = self.run(i, uw)
             cost += (self.labels[i] - y) ** 2
  
         cost /= len(self.input_states)
@@ -111,14 +111,12 @@ class QPerceptron():
  
     def callback_spsa(self, xk):
         print('\t## Iter: {} | Custo: {}'.format(len(self.cost_array), self.cost_array[-1]))
-        print(xk)
  
     def fit(self, X: list, y: list, niter: int = 300, learning_rate: float = 0.2):
         # Set training data
         if X is not None and y is not None:
             self.input_states = X
             self.labels = y
- 
  
         print('# No of inputs: {}'.format(len(self.input_states)))
         print('# Input size: {}'.format(len(self.input_states[0])))
@@ -142,7 +140,7 @@ class QPerceptron():
             bounds=[(0, np.pi/2)]*size,
             niter=niter,
             paired=False,   # sem seed
-            c=0.1, # qtd de aleatoriedade  
+            c=0.1, # aleatoriedade  
             a=learning_rate,
             callback=self.callback_spsa
         )
@@ -152,4 +150,16 @@ class QPerceptron():
         print('# Final cost: {}'.format(res.fun))
         print('# Cost array: {}'.format(self.cost_array))
         print(res)
+
+        self.set_weights(res.x)
         return res
+    
+    def predict(self, X: list):
+        self.input_states = X
+        labels = []
+        self.make_ui_gates(self.input_states)
+        uw = self._make_uw()
+        for i in range(len(self.input_states)):
+            y, resp = self.run(i, uw)
+            labels.append((y, resp))
+        return labels

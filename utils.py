@@ -2,6 +2,8 @@ import cv2
 import os
 import pandas as pd
 import numpy as np
+import zipfile
+import shutil
 
 def load_input(label: str, step: str, n_qbits: int = 10):
     """
@@ -12,6 +14,9 @@ def load_input(label: str, step: str, n_qbits: int = 10):
     @param n_qbits: The number of qubits for resizing image. Default: 10
     @return: The dataset as a list of input vectors.
     """
+    with zipfile.ZipFile(f'Dataset/imgs/{step}.zip', 'r') as zf:
+        zf.extractall('Dataset/imgs/')
+
     _dir = f'Dataset/imgs/{step}/{label}/'
     files = os.listdir(_dir)
     inputs = []
@@ -28,6 +33,8 @@ def load_input(label: str, step: str, n_qbits: int = 10):
         img = (img*np.pi/2)/255
         inputs.append(img)
     
+    shutil.rmtree(f'Dataset/imgs/{step}/')
+
     return inputs
 
 def train_df(n=32):

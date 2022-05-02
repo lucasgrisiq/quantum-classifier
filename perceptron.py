@@ -154,12 +154,12 @@ class QPerceptron():
         self.set_weights(res.x)
         return res
     
-    def predict(self, X: list):
+    def predict(self, X: list, threshold: float = 0.5):
         self.input_states = X
         labels = []
         self.make_ui_gates(self.input_states)
         uw = self._make_uw()
         for i in range(len(self.input_states)):
-            y, resp = self.run(i, uw)
+            y, resp = self.run(i, uw, threshold=threshold)
             labels.append((y, resp))
         return labels
